@@ -59,6 +59,10 @@ else
 LOCAL_WHOLE_STATIC_LIBRARIES += libcamera_parameters
 endif
 
+ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
+	LOCAL_CFLAGS += -DQCOM_HARDWARE
+endif
+
 LOCAL_MODULE:= libcamera_client
 
 include $(BUILD_SHARED_LIBRARY)
