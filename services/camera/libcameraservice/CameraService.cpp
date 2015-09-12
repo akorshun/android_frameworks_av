@@ -1222,7 +1222,13 @@ sp<CameraService::BasicClient> CameraService::findClientUnsafe(
         // Client::~Client() -> disconnect() -> removeClientByRemote().
         client = mClient[i].promote();
 
-        if ((client != NULL) && (cameraClient == client->getRemote())) {
+        // Clean up stale client entry
+        if (client == NULL) {
+            mClient[i].clear();
+            continue;
+        }
+
+        if (cameraClient == client->getRemote()) {
             // Found our camera
             outIndex = i;
             return client;
