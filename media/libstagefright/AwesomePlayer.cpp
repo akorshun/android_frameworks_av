@@ -81,7 +81,6 @@
 #define LPA_MIN_DURATION_USEC_ALLOWED 30000000
 #define LPA_MIN_DURATION_USEC_DEFAULT 60000000
 
-
 namespace android {
 
 static int64_t kLowWaterMarkUs = 2000000ll;  // 2secs

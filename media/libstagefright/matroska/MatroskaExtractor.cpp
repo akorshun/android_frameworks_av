@@ -266,13 +266,12 @@ MatroskaSource::MatroskaSource(
         mType = HEVC;
 
         uint32_t type;
-        const void *data;
+        const uint8_t *data;
         size_t size;
-        CHECK(meta->findData(kKeyHVCC, &type, &data, &size));
+        CHECK(meta->findData(kKeyHVCC, &type, (const void **)&data, &size));
 
-        const uint8_t *ptr = (const uint8_t *)data;
         CHECK(size >= 7);
-        mNALSizeLen = 1 + (ptr[14 + 7] & 3);
+        mNALSizeLen = 1 + (data[14 + 7] & 3);
         ALOGV("mNALSizeLen = %zu", mNALSizeLen);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)) {
         mType = AAC;
@@ -587,6 +586,7 @@ status_t MatroskaSource::readBlock() {
             mPendingFrames.clear();
 
             mBlockIter.advance();
+            mbuf->release();
             return ERROR_IO;
         }
 
@@ -707,9 +707,11 @@ status_t MatroskaSource::read(
             if (pass == 1) {
                 memcpy(&dstPtr[dstOffset], "\x00\x00\x00\x01", 4);
 
-                memcpy(&dstPtr[dstOffset + 4],
-                       &srcPtr[srcOffset + mNALSizeLen],
-                       NALsize);
+                if (frame != buffer) {
+                    memcpy(&dstPtr[dstOffset + 4],
+                           &srcPtr[srcOffset + mNALSizeLen],
+                           NALsize);
+                }
             }
 
             dstOffset += 4;  // 0x00 00 00 01
@@ -731,7 +733,13 @@ status_t MatroskaSource::read(
         if (pass == 0) {
             dstSize = dstOffset;
 
-            buffer = new MediaBuffer(dstSize);
+            if (dstSize == srcSize && mNALSizeLen == 4) {
+                // In this special case we can re-use the input buffer by substituting
+                // each 4-byte nal size with a 4-byte start code
+                buffer = frame;
+            } else {
+                buffer = new MediaBuffer(dstSize);
+            }
 
             int64_t timeUs;
             CHECK(frame->meta_data()->findInt64(kKeyTime, &timeUs));
@@ -745,8 +753,10 @@ status_t MatroskaSource::read(
         }
     }
 
-    frame->release();
-    frame = NULL;
+    if (frame != buffer) {
+        frame->release();
+        frame = NULL;
+    }
 
     if (targetSampleTimeUs >= 0ll) {
         buffer->meta_data()->setInt64(
@@ -1069,7 +1079,7 @@ int MatroskaExtractor::addTracks() {
                     }
                 } else if (!strcmp("V_MPEGH/ISO/HEVC", codecID)) {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
-                    meta->setData(kKeyHVCC, 0, codecPrivate, codecPrivateSize);
+                    meta->setData(kKeyHVCC, kTypeHVCC, codecPrivate, codecPrivateSize);
 
                 } else if (!strcmp("V_VP8", codecID)) {
                     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);

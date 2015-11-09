@@ -207,7 +207,8 @@ LOCAL_C_INCLUDES += \
         $(TOP)/hardware/$(SLSI_DIR)/$(TARGET_SOC)/libhwcmodule \
         $(TOP)/hardware/$(SLSI_DIR)/$(TARGET_SOC)/include \
         $(TOP)/hardware/$(SLSI_DIR)/exynos/libexynosutils \
-        $(TOP)/hardware/$(SLSI_DIR)/exynos/include
+        $(TOP)/hardware/$(SLSI_DIR)/exynos/include \
+        $(TOP)/hardware/$(SLSI_DIR)/exynos/libhwc
 
 LOCAL_ADDITIONAL_DEPENDENCIES := \
         $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
@@ -235,7 +236,8 @@ LOCAL_CFLAGS += -DUSE_SAMSUNG_COLORFORMAT
 
 # Include native color format header path
 LOCAL_C_INCLUDES += \
-	$(TOP)/$(TARGET_HAL_PATH)/include
+	$(TOP)/hardware/samsung/exynos4/hal/include \
+	$(TOP)/hardware/samsung/exynos4/include
 endif
 
 ifeq ($(BOARD_USE_SAMSUNG_CAMERAFORMAT_NV21), true)

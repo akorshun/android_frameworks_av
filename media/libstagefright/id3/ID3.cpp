@@ -602,6 +602,11 @@ const uint8_t *ID3::Iterator::getData(size_t *length) const {
         return NULL;
     }
 
+    // Prevent integer underflow
+    if (mFrameSize < getHeaderLength()) {
+        return NULL;
+    }
+
     *length = mFrameSize - getHeaderLength();
 
     return mFrameData;
@@ -684,7 +689,10 @@ void ID3::Iterator::findFrame() {
             }
 
             if (baseSize == 0) {
-                return;
+                /* Don't try to parse a frame with zero-sized data. Skip this
+                 * header entirely */
+                mOffset += 10; // http://id3.org/id3v2.4.0-structure section 3.1
+		continue;
             }
 
             // Prevent integer overflow when adding
@@ -813,6 +821,9 @@ ID3::getAlbumArt(size_t *length, String8 *mime) const {
     while (!it.done()) {
         size_t size;
         const uint8_t *data = it.getData(&size);
+        if (!data) {
+            return NULL;
+        }
 
         if (mVersion == ID3_V2_3 || mVersion == ID3_V2_4) {
             uint8_t encoding = data[0];

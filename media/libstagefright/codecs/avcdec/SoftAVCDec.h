@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 The Android Open Source Project
+ * Copyright 2015 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef SOFT_HEVC_H_
+#ifndef SOFT_H264_DEC_H_
 
-#define SOFT_HEVC_H_
+#define SOFT_H264_DEC_H_
 
 #include "SoftVideoDecoderOMXComponent.h"
 #include <sys/time.h>
 
 namespace android {
-
-#define ivd_aligned_malloc(alignment, size) memalign(alignment, size)
-#define ivd_aligned_free(buf) free(buf)
 
 /** Number of entries in the time-stamp array */
 #define MAX_TIME_STAMPS 64
@@ -52,19 +49,16 @@ namespace android {
     diff = ((end.tv_sec - start.tv_sec) * 1000000) + \
             (end.tv_usec - start.tv_usec);
 
-struct SoftHEVC: public SoftVideoDecoderOMXComponent {
-    SoftHEVC(const char *name, const OMX_CALLBACKTYPE *callbacks,
+struct SoftAVC : public SoftVideoDecoderOMXComponent {
+    SoftAVC(const char *name, const OMX_CALLBACKTYPE *callbacks,
             OMX_PTR appData, OMX_COMPONENTTYPE **component);
 
-    status_t init();
-
 protected:
-    virtual ~SoftHEVC();
+    virtual ~SoftAVC();
 
     virtual void onQueueFilled(OMX_U32 portIndex);
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onReset();
-    virtual OMX_ERRORTYPE internalSetParameter(OMX_INDEXTYPE index, const OMX_PTR params);
 private:
     // Number of input and output buffers
     enum {
@@ -72,8 +66,6 @@ private:
     };
 
     iv_obj_t *mCodecCtx;         // Codec context
-    iv_mem_rec_t *mMemRecords;   // Memory records requested by the codec
-    size_t mNumMemRecords;       // Number of memory records requested by the codec
 
     size_t mNumCores;            // Number of cores to be uesd by the codec
 
@@ -90,18 +82,22 @@ private:
     // they are maintained in the plugin
     OMX_S64 mTimeStamps[MAX_TIME_STAMPS];
 
+#ifdef FILE_DUMP_ENABLE
+    char mInFile[200];
+#endif /* FILE_DUMP_ENABLE */
+
     OMX_COLOR_FORMATTYPE mOmxColorFormat;    // OMX Color format
     IV_COLOR_FORMAT_T mIvColorFormat;        // Ittiam Color format
 
     bool mIsInFlush;        // codec is flush mode
     bool mReceivedEOS;      // EOS is receieved on input port
-    bool mInitNeeded;
-    uint32_t mNewWidth;
-    uint32_t mNewHeight;
+
     // The input stream has changed to a different resolution, which is still supported by the
     // codec. So the codec is switching to decode the new resolution.
     bool mChangingResolution;
     bool mFlushNeeded;
+    bool mSignalledError;
+    size_t mStride;
 
     status_t initDecoder();
     status_t deInitDecoder();
@@ -111,17 +107,65 @@ private:
     status_t setNumCores();
     status_t resetDecoder();
     status_t resetPlugin();
-    status_t reInitDecoder();
 
-    void setDecodeArgs(ivd_video_decode_ip_t *ps_dec_ip,
-        ivd_video_decode_op_t *ps_dec_op,
-        OMX_BUFFERHEADERTYPE *inHeader,
-        OMX_BUFFERHEADERTYPE *outHeader,
-        size_t timeStampIx);
 
-    DISALLOW_EVIL_CONSTRUCTORS (SoftHEVC);
+    void setDecodeArgs(
+            ivd_video_decode_ip_t *ps_dec_ip,
+            ivd_video_decode_op_t *ps_dec_op,
+            OMX_BUFFERHEADERTYPE *inHeader,
+            OMX_BUFFERHEADERTYPE *outHeader,
+            size_t timeStampIx);
+
+    DISALLOW_EVIL_CONSTRUCTORS(SoftAVC);
 };
+
+#ifdef FILE_DUMP_ENABLE
+
+#define INPUT_DUMP_PATH     "/sdcard/media/avcd_input"
+#define INPUT_DUMP_EXT      "h264"
+
+#define GENERATE_FILE_NAMES() {                         \
+    GETTIME(&mTimeStart, NULL);                         \
+    strcpy(mInFile, "");                                \
+    sprintf(mInFile, "%s_%ld.%ld.%s", INPUT_DUMP_PATH,  \
+            mTimeStart.tv_sec, mTimeStart.tv_usec,      \
+            INPUT_DUMP_EXT);                            \
+}
+
+#define CREATE_DUMP_FILE(m_filename) {                  \
+    FILE *fp = fopen(m_filename, "wb");                 \
+    if (fp != NULL) {                                   \
+        fclose(fp);                                     \
+    } else {                                            \
+        ALOGD("Could not open file %s", m_filename);    \
+    }                                                   \
+}
+#define DUMP_TO_FILE(m_filename, m_buf, m_size)         \
+{                                                       \
+    FILE *fp = fopen(m_filename, "ab");                 \
+    if (fp != NULL && m_buf != NULL) {                  \
+        int i;                                          \
+        i = fwrite(m_buf, 1, m_size, fp);               \
+        ALOGD("fwrite ret %d to write %d", i, m_size);  \
+        if (i != (int) m_size) {                        \
+            ALOGD("Error in fwrite, returned %d", i);   \
+            perror("Error in write to file");           \
+        }                                               \
+        fclose(fp);                                     \
+    } else {                                            \
+        ALOGD("Could not write to file %s", m_filename);\
+    }                                                   \
+}
+#else /* FILE_DUMP_ENABLE */
+#define INPUT_DUMP_PATH
+#define INPUT_DUMP_EXT
+#define OUTPUT_DUMP_PATH
+#define OUTPUT_DUMP_EXT
+#define GENERATE_FILE_NAMES()
+#define CREATE_DUMP_FILE(m_filename)
+#define DUMP_TO_FILE(m_filename, m_buf, m_size)
+#endif /* FILE_DUMP_ENABLE */
 
 } // namespace android
 
-#endif  // SOFT_HEVC_H_
+#endif  // SOFT_H264_DEC_H_

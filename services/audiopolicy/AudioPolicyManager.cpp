@@ -387,13 +387,14 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
                 }
             }
 #endif
+
+#ifdef QCOM_DIRECTTRACK
             if (audio_is_a2dp_device(device)) {
                AudioParameter param;
                param.add(String8("a2dp_connected"), String8("true"));
                mpClientInterface->setParameters(0, param.toString());
             }
 
-#ifdef QCOM_DIRECTTRACK
             if (device & AUDIO_DEVICE_OUT_USB_ACCESSORY) {
                AudioParameter param;
                param.add(String8("usb_connected"), String8("true"));
@@ -467,13 +468,14 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(audio_devices_t device,
                 }
             }
 #endif
+
+#ifdef QCOM_DIRECTTRACK
             if (audio_is_a2dp_device(device)) {
                AudioParameter param;
                param.add(String8("a2dp_connected"), String8("false"));
                mpClientInterface->setParameters(0, param.toString());
             }
 
-#ifdef QCOM_DIRECTTRACK
             if (device & AUDIO_DEVICE_OUT_USB_ACCESSORY) {
                 // handle USB device disconnection
                 AudioParameter param;
@@ -5190,10 +5192,13 @@ audio_io_handle_t AudioPolicyManager::getA2dpOutput()
             return mOutputs.keyAt(i);
         }
     }
+
+#ifdef QCOM_DIRECTTRACK
     DeviceVector deviceList = mAvailableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_ALL_A2DP);
         if (!deviceList.isEmpty()) {
              return 1;
         } else
+#endif
              return 0;
 }
 
@@ -5631,10 +5636,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             // when not in a phone call, phone strategy should route STREAM_VOICE_CALL to A2DP
             if (!isInCall() &&
                     (mForceUse[AUDIO_POLICY_FORCE_FOR_MEDIA] != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-#ifndef QCOM_DIRECTTRACK
-                    (getA2dpOutput() != 0) &&
-#endif
-                    !mA2dpSuspended) {
+                    (getA2dpOutput() != 0)) {
                 device = availableOutputDeviceTypes & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
                 if (device) break;
                 device = availableOutputDeviceTypes & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
@@ -5672,10 +5674,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
             // A2DP speaker when forcing to speaker output
             if (!isInCall() &&
                     (mForceUse[AUDIO_POLICY_FORCE_FOR_MEDIA] != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-#ifndef QCOM_DIRECTTRACK
-                    (getA2dpOutput() != 0) &&
-#endif
-                    !mA2dpSuspended) {
+                    (getA2dpOutput() != 0)) {
                 device = availableOutputDeviceTypes & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER;
                 if (device) break;
             }
@@ -5787,10 +5786,7 @@ audio_devices_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strate
         }
         if ((device2 == AUDIO_DEVICE_NONE) &&
                 (mForceUse[AUDIO_POLICY_FORCE_FOR_MEDIA] != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-#ifndef QCOM_DIRECTTRACK
-                (getA2dpOutput() != 0) &&
-#endif
-                !mA2dpSuspended) {
+                (getA2dpOutput() != 0)) {
             device2 = availableOutputDeviceTypes & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP;
             if (device2 == AUDIO_DEVICE_NONE) {
                 device2 = availableOutputDeviceTypes & AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES;
@@ -8820,10 +8816,14 @@ AudioPolicyManager::DeviceVector AudioPolicyManager::DeviceVector::getDevicesFro
                                                                         audio_devices_t type) const
 {
     DeviceVector devices;
+    bool isOutput = audio_is_output_devices(type);
+    type &= ~AUDIO_DEVICE_BIT_IN;
     for (size_t i = 0; (i < size()) && (type != AUDIO_DEVICE_NONE); i++) {
-        if (itemAt(i)->mDeviceType & type & ~AUDIO_DEVICE_BIT_IN) {
+        bool curIsOutput = audio_is_output_devices(itemAt(i)->mDeviceType);
+        audio_devices_t curType = itemAt(i)->mDeviceType & ~AUDIO_DEVICE_BIT_IN;
+        if ((isOutput == curIsOutput) && ((type & curType) != 0)) {
             devices.add(itemAt(i));
-            type &= ~itemAt(i)->mDeviceType;
+            type &= ~curType;
             ALOGV("DeviceVector::getDevicesFromType() for type %x found %p",
                   itemAt(i)->mDeviceType, itemAt(i).get());
         }
